@@ -4,18 +4,25 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.NetworkInfo;
+import android.net.wifi.WpsInfo;
+import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,15 +30,15 @@ import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements WifiP2pManager.PeerListListener, View.OnClickListener {
     // Initializing variable(s)
-    private static final String TAG = "main";
+    private static final String TAG = "MAIN";
     private final IntentFilter intentFilter = new IntentFilter();
     private WifiP2pManager.Channel mChannel;
     private WifiP2pManager mManager;
     private WifiScan mWifiScan;
     private Context mContext;
     private List<WifiP2pDevice> mPeers = new ArrayList();
-    private ArrayList<String> fakeData = new ArrayList<String>();
-    private ListView lw;
+    private ArrayList<String> data = new ArrayList<String>();
+    private ListView lv;
 
     private Button startServiceButton;
     private Button stopServiceButton;
@@ -160,7 +167,6 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
     // Invoked on requestPeers()
     @Override
     public void onPeersAvailable(WifiP2pDeviceList peers) {
-        // Out with the old, in with the new.
         mPeers.clear();
         mPeers.addAll(peers.getDeviceList());
 
@@ -168,16 +174,64 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
         // of the change.  For instance, if you have a ListView of available
         // peers, trigger an update.
         if(mPeers.size() == 0) {
-            Toast.makeText(mContext, "No devices found", Toast.LENGTH_LONG).show();
+            Toast.makeText(mContext, "No devices found", Toast.LENGTH_SHORT).show();
             Log.d(TAG, "No devices found");
             return;
         } else {
+            data.clear();
             for(int i = 0; i < mPeers.size(); i++) {
-                Toast.makeText(mContext, "Peer: " + mPeers.get(i).deviceAddress + " " +
-                                    mPeers.get(i).deviceName, Toast.LENGTH_LONG).show();
                 System.out.println("Peer: " + mPeers.get(i).deviceAddress + " " +
                                     mPeers.get(i).deviceName);
+                data.add(i, mPeers.get(i).deviceAddress + " " + mPeers.get(i).deviceName);
             }
+            lv = (ListView)findViewById(R.id.main_listview);
+            lv.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, data));
+        }
+    }
+
+    public void connect() {
+//        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+//            @Override
+//            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+//                WifiP2pDeviceList device = mPeers.get(position);
+//                WifiP2pConfig config = new WifiP2pConfig();
+//                config.deviceAddress = device.deviceAddress;
+//                config.wps.setup = WpsInfo.PBC; // WpsInfo: A class representing Wi-Fi Protected Setup
+//            }
+//        });
+        // Picking the first device found on the network.
+        WifiP2pDevice device = mPeers.get(0);
+        // WifiP2pConfig: a class representing a Wi-Fi P2p configuration for setting up a connection
+        WifiP2pConfig config = new WifiP2pConfig();
+        config.deviceAddress = device.deviceAddress;
+        config.wps.setup = WpsInfo.PBC; // WpsInfo: A class representing Wi-Fi Protected Setup
+
+        mManager.connect(mChannel, config, new WifiP2pManager.ActionListener() {
+            @Override
+            public void onSuccess() {
+                // WiFiDirectBroadcastReceiver will notify us. Ignore for now.
+            }
+
+            @Override
+            public void onFailure(int reason) {
+                Toast.makeText(mContext, "Connect failed. Retry.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+    public void onConnectionInfoAvailable(final WifiP2pInfo info) {
+        // InetAddress from WifiP2pInfo struct.
+//        InetAddress groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
+        String groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
+
+        // After the group negotiation, we can determine the group owner.
+        if(info.groupFormed && info.isGroupOwner) {
+            // Do whatever tasks are specific to the group owner.
+            // One common case is creating a server thread and accepting
+            // incoming connections.
+        }else if (info.groupFormed) {
+            // The other device acts as the client. In this case,
+            // you'll want to create a client thread that connects to the group
+            // owner.
         }
     }
 
@@ -216,19 +270,30 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
                     Log.d(TAG, "wifi is not enabled");
                 }
             } else if(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
-                // The peer list has changed!  We should probably do something about
-                // that.
+                // Request available peers from the wifi p2p manager. This is an
+                // asynchronous call and the calling activity is notified with a
+                // callback on onPeersAvailable()
                 if (mManager != null) {
                     mManager.requestPeers(mChannel, (MainActivity) mContext);
                 }
                 Log.d(TAG, "P2P peers changed");
 
             } else if(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
+                if(mManager == null) {
+                    return;
+                }
+                NetworkInfo networkInfo = (NetworkInfo) intent
+                        .getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 
+                if(networkInfo.isConnected()) {
+                    // We are connected with the other device, request connection
+                    // info to find group owner IP
+                    mManager.requestConnectionInfo(mChannel, null);
+                    Toast.makeText(mContext, "Connected!", Toast.LENGTH_SHORT).show();
+                }
             } else if(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {
 
             }
-
         }
     }
 }

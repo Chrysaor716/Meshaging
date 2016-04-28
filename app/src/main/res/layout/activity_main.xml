@@ -8,9 +8,6 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="io.tina.chris.meshaging.MainActivity">
-    <!--<ListView android:id="@+id/main_listview"-->
-    <!--android:layout_width="match_parent"-->
-    <!--android:layout_height="wrap_content"/>-->
 
     <Button
         android:id="@+id/start_service"
@@ -39,4 +36,9 @@
         android:layout_toEndOf="@id/stop_service"
         android:layout_below="@id/peer_scan"
         android:text="List peers" />
+
+    <ListView android:id="@+id/main_listview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/stop_service"/>
 </RelativeLayout>
