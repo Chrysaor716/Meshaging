@@ -50,6 +50,8 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
     private Map record;
     private WifiP2pDnsSdServiceInfo serviceInfo;
 
+    ArrayAdapter arrayAdapter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -79,8 +81,10 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
         mManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
         mChannel = mManager.initialize(this, getMainLooper(), null);
 
+        arrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, data);
         // Click listener for listview in UI that lists available peers
         lv = (ListView)findViewById(R.id.main_listview);
+        lv.setAdapter(arrayAdapter);
         lv.setOnItemClickListener(this);
     }
 
@@ -187,52 +191,49 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
         } else {
             data.clear();
             for(int i = 0; i < mPeers.size(); i++) {
-                System.out.println("Peer: " + mPeers.get(i).deviceAddress + " " +
-                                    mPeers.get(i).deviceName);
+                System.out.println("Peer: " + mPeers.get(i).deviceAddress + " " + mPeers.get(i).deviceName);
                 data.add(i, mPeers.get(i).deviceAddress + " " + mPeers.get(i).deviceName);
             }
             // Update the list view in the UI
-            lv.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, data));
+            arrayAdapter.notifyDataSetChanged();
         }
     }
 
-    private void connect() {
-
-        // Picking the first device found on the network.
-        WifiP2pDevice device = mPeers.get(0);
+    private void connect(int index) {
+        // Picking the device based on the position on the list that the user clicked on in List View
+        WifiP2pDevice device = mPeers.get(index);
         // WifiP2pConfig: a class representing a Wi-Fi P2p configuration for setting up a connection
         WifiP2pConfig config = new WifiP2pConfig();
         config.deviceAddress = device.deviceAddress;
         config.wps.setup = WpsInfo.PBC; // WpsInfo: A class representing Wi-Fi Protected Setup
-
+        // Notifies you when the initiation succeeds or fails
         mManager.connect(mChannel, config, new WifiP2pManager.ActionListener() {
             @Override
             public void onSuccess() {
                 // WiFiDirectBroadcastReceiver will notify us. Ignore for now.
             }
-
             @Override
             public void onFailure(int reason) {
                 Toast.makeText(mContext, "Connect failed. Retry.", Toast.LENGTH_SHORT).show();
             }
         });
     }
-    public void onConnectionInfoAvailable(final WifiP2pInfo info) {
-        // InetAddress from WifiP2pInfo struct.
-//        InetAddress groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
-        String groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
-
-        // After the group negotiation, we can determine the group owner.
-        if(info.groupFormed && info.isGroupOwner) {
-            // Do whatever tasks are specific to the group owner.
-            // One common case is creating a server thread and accepting
-            // incoming connections.
-        }else if (info.groupFormed) {
-            // The other device acts as the client. In this case,
-            // you'll want to create a client thread that connects to the group
-            // owner.
-        }
-    }
+//    public void onConnectionInfoAvailable(final WifiP2pInfo info) {
+//        // InetAddress from WifiP2pInfo struct.
+////        InetAddress groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
+//        String groupOwnerAddress = info.groupOwnerAddress.getHostAddress();
+//
+//        // After the group negotiation, we can determine the group owner.
+//        if(info.groupFormed && info.isGroupOwner) {
+//            // Do whatever tasks are specific to the group owner.
+//            // One common case is creating a server thread and accepting
+//            // incoming connections.
+//        }else if (info.groupFormed) {
+//            // The other device acts as the client. In this case,
+//            // you'll want to create a client thread that connects to the group
+//            // owner.
+//        }
+//    }
 
     @Override
     public void onClick(View v) {
@@ -259,8 +260,8 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
 
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        System.out.println("Position: " + position);
-        System.out.println("ID: " + id);
+//        System.out.println(mPeers.get(0));
+        connect(position);
     }
 
     class WifiScan extends BroadcastReceiver {
