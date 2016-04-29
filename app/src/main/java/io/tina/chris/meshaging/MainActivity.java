@@ -13,6 +13,7 @@ import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -28,7 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements WifiP2pManager.PeerListListener, View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements WifiP2pManager.PeerListListener,
+        View.OnClickListener, AdapterView.OnItemClickListener {
     // Initializing variable(s)
     private static final String TAG = "MAIN";
     private final IntentFilter intentFilter = new IntentFilter();
@@ -76,6 +78,10 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
         // connect the app to thw Wi-Fi P2P framework.
         mManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
         mChannel = mManager.initialize(this, getMainLooper(), null);
+
+        // Click listener for listview in UI that lists available peers
+        lv = (ListView)findViewById(R.id.main_listview);
+        lv.setOnItemClickListener(this);
     }
 
     private void startRegistration() {
@@ -132,6 +138,7 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
     }
 
     private void scanPeers() {
+        // If discoverPeers() does find peers, acton WIFI_P2P_PEERS_CHANGED_ACTION will be triggered
         mManager.discoverPeers(mChannel, new WifiP2pManager.ActionListener() {
             @Override
             public void onSuccess() {
@@ -168,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
     @Override
     public void onPeersAvailable(WifiP2pDeviceList peers) {
         mPeers.clear();
-        mPeers.addAll(peers.getDeviceList());
+        mPeers.addAll(peers.getDeviceList()); // "peers" parameter = discovered peers
 
         // If an AdapterView is backed by this data, notify it
         // of the change.  For instance, if you have a ListView of available
@@ -184,21 +191,13 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
                                     mPeers.get(i).deviceName);
                 data.add(i, mPeers.get(i).deviceAddress + " " + mPeers.get(i).deviceName);
             }
-            lv = (ListView)findViewById(R.id.main_listview);
+            // Update the list view in the UI
             lv.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, data));
         }
     }
 
-    public void connect() {
-//        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-//            @Override
-//            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-//                WifiP2pDeviceList device = mPeers.get(position);
-//                WifiP2pConfig config = new WifiP2pConfig();
-//                config.deviceAddress = device.deviceAddress;
-//                config.wps.setup = WpsInfo.PBC; // WpsInfo: A class representing Wi-Fi Protected Setup
-//            }
-//        });
+    private void connect() {
+
         // Picking the first device found on the network.
         WifiP2pDevice device = mPeers.get(0);
         // WifiP2pConfig: a class representing a Wi-Fi P2p configuration for setting up a connection
@@ -248,6 +247,8 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
             case R.id.peer_scan:
                 scanPeers();
                 break;
+            // WIFI_P2P_PEERS_CHANGED_ACTION automatically invokes requestPeers(), but this button
+            // can be clicked to update peer list.
             case R.id.peer_list:
                 if (mManager != null) {
                     mManager.requestPeers(mChannel, (MainActivity)mContext);
@@ -256,18 +257,23 @@ public class MainActivity extends AppCompatActivity implements WifiP2pManager.Pe
         }
     }
 
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+        System.out.println("Position: " + position);
+        System.out.println("ID: " + id);
+    }
+
     class WifiScan extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
-                // Determine if Wifi P2P mode is enabled or not, alert
-                // the Activity.
+                // Determine if Wifi P2P mode is enabled or not, alert the Activity.
                 int state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1);
                 if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
-                    Log.d(TAG, "wifi is enabled");
+                    Log.d(TAG, "Wifi is enabled");
                 } else {
-                    Log.d(TAG, "wifi is not enabled");
+                    Log.d(TAG, "Wifi is not enabled");
                 }
             } else if(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
                 // Request available peers from the wifi p2p manager. This is an
