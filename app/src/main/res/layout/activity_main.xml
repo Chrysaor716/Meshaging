@@ -37,8 +37,15 @@
         android:layout_below="@id/peer_scan"
         android:text="List peers" />
 
-    <ListView android:id="@+id/main_listview"
+    <ListView
+        android:id="@+id/main_listview"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/stop_service"/>
+
+    <TextView
+        android:id="@+id/group_info"
+        android:layout_width="200dp"
+        android:layout_height="100dp"
+        android:layout_toEndOf="@id/peer_scan" />
 </RelativeLayout>
